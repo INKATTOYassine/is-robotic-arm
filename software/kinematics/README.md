@@ -5,11 +5,12 @@ Mathematical model of the arm's motion.
 ## Structure
 
 - [`fk_simulator/`](fk_simulator/README.md) — Interactive DH/FK debugger and visualizer (working)
+- [`ik_simulator/`](ik_simulator/README.md) — Interactive analytical IK solver and visualizer (working, numerically verified against FK)
 
 ## Status
 
 - **Forward kinematics (FK):** done, derived from first principles (standard DH convention) and verified against the CAD design.
-- **Inverse kinematics (IK):** analytical solution derived (kinematic decoupling, `atan2`-based) — not yet implemented in code.
+- **Inverse kinematics (IK):** done — analytical solution (kinematic decoupling, `atan2`-based, elbow-up/elbow-down posture choice), implemented and verified (IK → FK round-trip reproduces the target position exactly).
 
 ## DH parameters
 

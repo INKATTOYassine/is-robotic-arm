@@ -1,11 +1,11 @@
 """
 is-robotic-arm - DH / FK interactive debugger
 ------------------------------------------------
-Application PyQt5 + pyqtgraph (rendu OpenGL) pour visualiser et debugger
-en temps reel le modele DH d'un bras robotique 5DOF.
+PyQt5 + pyqtgraph application (OpenGL rendering) to visualize and debug
+the DH model of a 5DOF robotic arm in real-time.
 
-Convention utilisee : DH standard, A_i = Rz(theta_i+offset_i)·Tz(d_i)·Tx(a_i)·Rx(alpha_i)
-Repere monde : X=avant, Y=gauche, Z=haut (convention ROS REP-103)
+Convention used: Standard DH, A_i = Rz(theta_i+offset_i)·Tz(d_i)·Tx(a_i)·Rx(alpha_i)
+World frame: X=forward, Y=left, Z=up (ROS REP-103 convention)
 """
 
 import sys
@@ -15,12 +15,12 @@ import pyqtgraph.opengl as gl
 
 
 # ----------------------------------------------------------------------
-# Cinematique
+# Kinematics
 # ----------------------------------------------------------------------
 
 def dh_matrix(alpha, a, d, theta):
-    """Construit la matrice de transformation homogene 4x4 d'un seul joint,
-    a partir de ses 4 parametres DH (convention standard)."""
+    """Builds the 4x4 homogeneous transformation matrix of a single joint,
+    from its 4 DH parameters (standard convention)."""
     ct, st = np.cos(theta), np.sin(theta)
     ca, sa = np.cos(alpha), np.sin(alpha)
     return np.array([
@@ -32,11 +32,11 @@ def dh_matrix(alpha, a, d, theta):
 
 
 def forward_kinematics(dh_rows, thetas_deg):
-    """Calcule le FK complet : construit chaque matrice A_i puis les enchaine
-    (T0->T1->...->T5) par multiplication. theta_i utilise = angle physique
-    du slider + l'offset constant de la ligne DH correspondante.
-    Retourne la liste des 6 reperes cumules [T0, T1, T2, T3, T4, T5]
-    (T0 = origine du robot, T5 = effecteur)."""
+    """Calculates the complete FK: builds each A_i matrix then chains them
+    (T0->T1->...->T5) by multiplication. Used theta_i = physical 
+    slider angle + constant offset of the corresponding DH row.
+    Returns the list of 6 cumulative frames [T0, T1, T2, T3, T4, T5]
+    (T0 = robot origin, T5 = end effector)."""
     T = np.eye(4)
     frames = [T.copy()]
     for row, th_deg in zip(dh_rows, thetas_deg):
@@ -48,16 +48,16 @@ def forward_kinematics(dh_rows, thetas_deg):
 
 
 def joint_axis_world(frames, joint_index_1based):
-    """Direction reelle, dans le repere monde, de l'axe de rotation du
-    joint i (1..5). En DH standard, le joint i tourne autour de z_(i-1),
-    qui est la 3e colonne de la matrice de rotation du repere i-1
-    -> d'ou l'indexation frames[i-1]."""
+    """Actual direction, in the world frame, of the rotation axis of
+    joint i (1..5). In standard DH, joint i rotates around z_(i-1),
+    which is the 3rd column of the rotation matrix of frame i-1
+    -> hence the indexing frames[i-1]."""
     return frames[joint_index_1based - 1][:3, 2]
 
 
 def rotation_to_rpy_deg(R):
-    """Extrait roll/pitch/yaw (convention ZYX) en degres depuis une matrice
-    de rotation 3x3, pour affichage lisible dans le panneau de lecture."""
+    """Extracts roll/pitch/yaw (ZYX convention) in degrees from a 3x3
+    rotation matrix, for readable display in the readout panel."""
     pitch = np.degrees(np.arcsin(-np.clip(R[2, 0], -1.0, 1.0)))
     roll = np.degrees(np.arctan2(R[2, 1], R[2, 2]))
     yaw = np.degrees(np.arctan2(R[1, 0], R[0, 0]))
@@ -67,9 +67,9 @@ def rotation_to_rpy_deg(R):
 JOINT_NAMES = ["J1 base (yaw)", "J2 epaule (pitch)", "J3 coude (pitch)",
                "J4 poignet1 (pitch)", "J5 poignet2 (roll)"]
 
-# Table DH de depart (editable en live dans l'UI). L'offset de +90 sur J4
-# est necessaire pour que l'axe du roll (J5) soit coaxial au bras a la
-# config home (verifie et documente plus tot dans le projet).
+# Initial DH table (live editable in the UI). The +90 offset on J4 is
+# necessary so that the roll axis (J5) is coaxial to the arm at the
+# home config (verified and documented earlier in the project).
 DEFAULT_DH = [
     {'alpha_deg': 90.0, 'a': 0.0,  'd': 0.25, 'offset_deg': 0.0},
     {'alpha_deg': 0.0,  'a': 0.30, 'd': 0.0,  'offset_deg': 0.0},
@@ -84,7 +84,7 @@ GEOMETRIC_CHECKS = [
 
 
 # ----------------------------------------------------------------------
-# Palette theme sombre
+# Dark theme palette
 # ----------------------------------------------------------------------
 BG = '#1a1d23'
 PANEL = '#22262e'
@@ -126,8 +126,8 @@ QTextEdit {{ background-color: #14161b; border: 1px solid {BORDER}; border-radiu
 
 
 class ThetaSlider(QtWidgets.QWidget):
-    """Un slider theta (degres, -180 a 180) avec label de nom et affichage
-    de la valeur courante. Emet valueChanged(deg) a chaque mouvement."""
+    """A theta slider (degrees, -180 to 180) with name label and display
+    of the current value. Emits valueChanged(deg) on every movement."""
     valueChanged = QtCore.pyqtSignal(float)
 
     def __init__(self, name, parent=None):
@@ -136,7 +136,7 @@ class ThetaSlider(QtWidgets.QWidget):
         layout.setContentsMargins(0, 3, 0, 3)
         self.label = QtWidgets.QLabel(name)
         self.label.setFixedWidth(130)
-        # Slider en dixiemes de degre (int) pour une precision de 0.1°
+        # Slider in tenths of a degree (int) for 0.1° precision
         self.slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
         self.slider.setMinimum(-1800)
         self.slider.setMaximum(1800)
@@ -155,15 +155,15 @@ class ThetaSlider(QtWidgets.QWidget):
         self.valueChanged.emit(deg)
 
     def set_value(self, deg):
-        """Deplace le slider par programme (ex: bouton Reset) ;
-        declenche automatiquement _on_change() -> valueChanged."""
+        """Moves the slider programmatically (e.g., Reset button);
+        automatically triggers _on_change() -> valueChanged."""
         self.slider.setValue(int(deg * 10))
 
 
 class DHRow(QtWidgets.QWidget):
-    """Une ligne editable de la table DH : 4 champs numeriques
-    (alpha, a, d, offset) pour un joint. Modifie directement le
-    dictionnaire `row` passe en reference et emet changed() a chaque edit."""
+    """An editable row of the DH table: 4 numeric fields
+    (alpha, a, d, offset) for one joint. Directly modifies the
+    `row` dictionary passed by reference and emits changed() on every edit."""
     changed = QtCore.pyqtSignal()
 
     def __init__(self, name, row, parent=None):
@@ -189,9 +189,9 @@ class DHRow(QtWidgets.QWidget):
             self.boxes[key] = box
 
     def _make_cb(self, key):
-        """Fabrique un callback qui met a jour la bonne cle du dict `row`
-        (une closure par champ, necessaire car chaque QDoubleSpinBox
-        doit savoir quelle cle il represente)."""
+        """Creates a callback that updates the correct key in the `row` dict
+        (one closure per field, necessary because each QDoubleSpinBox
+        must know which key it represents)."""
         def cb(val):
             self.row[key] = val
             self.changed.emit()
@@ -199,7 +199,7 @@ class DHRow(QtWidgets.QWidget):
 
 
 class AxisLegend(QtWidgets.QWidget):
-    """Legende couleur (X/Y/Z/liens) affichee sous la vue 3D."""
+    """Color legend (X/Y/Z/links) displayed under the 3D view."""
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QtWidgets.QHBoxLayout(self)
@@ -217,14 +217,14 @@ class AxisLegend(QtWidgets.QWidget):
 
 
 class GeometryCheckPanel(QtWidgets.QWidget):
-    """Panneau de validation live de la table DH : verifie des proprietes
-    geometriques structurelles (parallelisme/perpendicularite entre axes
-    de joints consecutifs) et colore chaque ligne en vert/rouge.
+    """Live DH table validation panel: checks structural geometric properties
+    (parallelism/perpendicularity between consecutive joint axes) and colors
+    each row in green/red.
 
-    Important : ces 4 checks sont des INVARIANTS mathematiques de la table
-    (ils ne dependent que des alpha_i, pas des valeurs actuelles de theta)
-    -> ils restent valides quelle que soit la position des sliders, et se
-    mettent a jour immediatement si on modifie un alpha dans la table DH."""
+    Important: these 4 checks are mathematical INVARIANTS of the table
+    (they only depend on alpha_i, not on the current theta values)
+    -> they remain valid regardless of the slider positions, and update
+    immediately if an alpha is modified in the DH table."""
     def __init__(self, parent=None):
         super().__init__(parent)
         self.layout_ = QtWidgets.QVBoxLayout(self)
@@ -248,9 +248,9 @@ class GeometryCheckPanel(QtWidgets.QWidget):
             self.rows[key] = dot
 
     def update_checks(self, frames):
-        """Recalcule les 4 verifications a partir des reperes FK actuels
-        et met a jour la couleur (vert=OK, orange=incoherent) de chaque
-        pastille."""
+        """Recalculates the 4 checks from the current FK frames
+        and updates the color (green=OK, orange=inconsistent) of each
+        dot."""
         def axis(i):
             return joint_axis_world(frames, i)
 
@@ -272,10 +272,10 @@ class GeometryCheckPanel(QtWidgets.QWidget):
 
 
 class CustomTitleBar(QtWidgets.QWidget):
-    """Barre de titre custom (remplace la barre native de l'OS, retiree
-    via setWindowFlags(FramelessWindowHint) dans DHFKApp) : titre,
-    boutons reduire/agrandir/fermer, et deplacement de la fenetre au
-    clic-glisse puisque l'OS ne gere plus ca lui-meme."""
+    """Custom title bar (replaces the native OS bar, removed
+    via setWindowFlags(FramelessWindowHint) in DHFKApp): title,
+    minimize/maximize/close buttons, and window dragging since
+    the OS no longer handles it."""
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
@@ -336,7 +336,7 @@ class CustomTitleBar(QtWidgets.QWidget):
         self.btn_close.clicked.connect(self.parent.close)
         layout.addWidget(self.btn_close)
 
-        self.offset = None  # position du clic dans la barre, pour le drag
+        self.offset = None  # click position in the bar, for dragging
 
     def toggle_max_restore(self):
         if self.parent.isMaximized():
@@ -344,8 +344,8 @@ class CustomTitleBar(QtWidgets.QWidget):
         else:
             self.parent.showMaximized()
 
-    # Deplacement de la fenetre par clic-glisse (necessaire car la fenetre
-    # est frameless, donc l'OS ne fournit plus cette interaction par defaut)
+    # Window dragging (necessary because the window is frameless,
+    # so the OS no longer provides this interaction by default)
     def mousePressEvent(self, event):
         if event.button() == QtCore.Qt.LeftButton:
             self.offset = event.pos()
@@ -364,19 +364,18 @@ class CustomTitleBar(QtWidgets.QWidget):
 
 
 class DHFKApp(QtWidgets.QMainWindow):
-    """Fenetre principale : vue 3D OpenGL a gauche, panneau de controle
-    (onglets Controles / Debug) a droite. Orchestre le calcul FK et la
-    mise a jour de tous les affichages a chaque changement (slider,
-    table DH, options d'affichage)."""
+    """Main window: OpenGL 3D view on the left, control panel
+    (Controls / Debug tabs) on the right. Orchestrates the FK calculation and
+    updates all displays on every change (slider, DH table, display options)."""
     def __init__(self):
         super().__init__()
 
-        # Fenetre sans cadre natif -> UI entierement custom (voir CustomTitleBar)
+        # Frameless window -> fully custom UI (see CustomTitleBar)
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint)
         self.resize(1480, 860)
 
-        # Bordure ajoutee manuellement autour de toute l'appli pour qu'elle
-        # ne se fonde pas dans le fond de l'ecran (consequence du frameless)
+        # Border manually added around the entire app so it doesn't
+        # blend into the screen background (consequence of being frameless)
         modified_stylesheet = STYLESHEET + f"""
             #MainContainer {{
                 border: 1px solid {BORDER};
@@ -387,7 +386,7 @@ class DHFKApp(QtWidgets.QMainWindow):
 
         self.dh = [row.copy() for row in DEFAULT_DH]
         self.thetas_deg = [0.0] * 5
-        self.axis_len = 0.15  # longueur d'affichage des triades d'axes (m)
+        self.axis_len = 0.15  # display length of the axis triads (m)
 
         main_container = QtWidgets.QWidget()
         main_container.setObjectName("MainContainer")
@@ -400,7 +399,7 @@ class DHFKApp(QtWidgets.QMainWindow):
         self.title_bar = CustomTitleBar(self)
         global_layout.addWidget(self.title_bar)
 
-        # Contenu principal (vue 3D + panneau lateral), sous la barre de titre
+        # Main content (3D view + side panel), under the title bar
         content_widget = QtWidgets.QWidget()
         content_layout = QtWidgets.QHBoxLayout(content_widget)
         content_layout.setContentsMargins(10, 10, 10, 10)
@@ -422,7 +421,7 @@ class DHFKApp(QtWidgets.QMainWindow):
 
     # ------------------------------------------------------------------
     def _build_3d_view(self):
-        """Cree la vue OpenGL (GLViewWidget) avec sa grille de sol."""
+        """Creates the OpenGL view (GLViewWidget) with its ground grid."""
         self.gl_view = gl.GLViewWidget()
         self.gl_view.setBackgroundColor(BG)
         self.gl_view.setCameraPosition(distance=1.6, elevation=22, azimuth=35)
@@ -434,11 +433,9 @@ class DHFKApp(QtWidgets.QMainWindow):
         return self.gl_view
 
     def _init_gl_items(self):
-        """Cree une seule fois les objets graphiques 3D (lien du bras,
-        marqueurs de joints, axes x/y/z) ; les updates suivants ne font
-        que reecrire leurs donnees (setData), jamais les recreer
-        -> essentiel pour la fluidite et pour ne pas reinitialiser la
-        camera a chaque frame."""
+        """Creates the 3D graphical objects (arm links, joint markers, x/y/z axes)
+        only once; subsequent updates only rewrite their data (setData), never recreate them
+        -> essential for smoothness and to not reset the camera on every frame."""
         self.link_item = gl.GLLinePlotItem(color=LINK_COLOR, width=5, antialias=True)
         self.gl_view.addItem(self.link_item)
 
@@ -452,14 +449,14 @@ class DHFKApp(QtWidgets.QMainWindow):
             self.gl_view.addItem(it)
 
     def _rescale_view(self):
-        """Ajuste la distance de la camera a l'envergure totale du bras
-        (somme des a_i et d_i). Appele uniquement quand la table DH
-        change (pas a chaque mouvement de theta)."""
+        """Adjusts the camera distance to the total span of the arm
+        (sum of a_i and d_i). Called only when the DH table
+        changes (not on every theta movement)."""
         reach = sum(r['a'] for r in self.dh) + sum(r['d'] for r in self.dh) + 0.05
         self.gl_view.setCameraPosition(distance=max(reach, 0.3) * 2.6)
 
     def _build_side_panel(self):
-        """Panneau lateral droit : onglets Controles/Debug + bouton reset."""
+        """Right side panel: Controls/Debug tabs + reset button."""
         panel = QtWidgets.QWidget()
         panel.setMaximumWidth(500)
         v = QtWidgets.QVBoxLayout(panel)
@@ -477,8 +474,7 @@ class DHFKApp(QtWidgets.QMainWindow):
         return panel
 
     def _build_controls_tab(self):
-        """Onglet Controles : sliders theta, table DH editable, options
-        d'affichage des reperes."""
+        """Controls tab: theta sliders, editable DH table, frame display options."""
         tab = QtWidgets.QWidget()
         v = QtWidgets.QVBoxLayout(tab)
         v.setSpacing(10)
@@ -515,9 +511,9 @@ class DHFKApp(QtWidgets.QMainWindow):
         return tab
 
     def _build_frame_display_group(self):
-        """Groupe d'options de visualisation : taille des triades d'axes,
-        quels axes (x/y/z) afficher, et quels reperes (parmi les 6
-        disponibles) afficher individuellement."""
+        """Visualization options group: size of the axis triads,
+        which axes (x/y/z) to display, and which frames (among the 6
+        available) to display individually."""
         gb = QtWidgets.QGroupBox("Repères affichés (Visualisation)")
         v = QtWidgets.QVBoxLayout(gb)
 
@@ -549,8 +545,8 @@ class DHFKApp(QtWidgets.QMainWindow):
         axis_row.addStretch()
         v.addLayout(axis_row)
 
-        # 6 reperes affichables : le repere "monde" (place dans un coin pour
-        # reference visuelle) + les 5 reperes physiques du bras
+        # 6 displayable frames: the "world" frame (placed in a corner for
+        # visual reference) + the 5 physical frames of the arm
         frame_labels = [
             "Monde (Coin CAD)",
             "Repère 1 (Base)",
@@ -582,9 +578,9 @@ class DHFKApp(QtWidgets.QMainWindow):
         return gb
 
     def _set_all_frame_checks(self, state):
-        """Coche/decoche tous les reperes d'un coup (boutons Tout afficher/cacher)."""
+        """Checks/unchecks all frames at once (Show all/Hide all buttons)."""
         for cb in self.frame_checks:
-            cb.blockSignals(True)  # evite de redessiner 6 fois de suite
+            cb.blockSignals(True)  # avoids redrawing 6 times in a row
             cb.setChecked(state)
             cb.blockSignals(False)
         self.update_scene()
@@ -598,8 +594,8 @@ class DHFKApp(QtWidgets.QMainWindow):
         self.update_scene()
 
     def _build_debug_tab(self):
-        """Onglet Debug : panneau de validation geometrique live +
-        lecture texte complete du FK (position, orientation, axes)."""
+        """Debug tab: live geometric validation panel +
+        complete text readout of the FK (position, orientation, axes)."""
         tab = QtWidgets.QWidget()
         v = QtWidgets.QVBoxLayout(tab)
         v.setSpacing(10)
@@ -642,23 +638,22 @@ class DHFKApp(QtWidgets.QMainWindow):
 
     # ------------------------------------------------------------------
     def update_scene(self):
-        """Point d'entree central : recalcule le FK et met a jour tous
-        les affichages (3D, lecture texte, panneau de validation).
-        Appele a chaque changement de slider, de table DH, ou d'option
-        d'affichage."""
-        # 1. FK pur : les 6 reperes cumules T0..T5
+        """Central entry point: recalculates the FK and updates all
+        displays (3D, text readout, validation panel).
+        Called on every slider, DH table, or display option change."""
+        # 1. Pure FK: the 6 cumulative frames T0..T5
         dh_frames = forward_kinematics(self.dh, self.thetas_deg)
 
-        # 2. Repere "monde" purement visuel, decale dans un coin pour
-        # servir de reference fixe independamment de la pose du bras
+        # 2. Purely visual "world" frame, shifted to a corner to
+        # serve as a fixed reference independently of the arm's pose
         T_world = np.eye(4)
         T_world[0, 3] = -0.4
         T_world[1, 3] = -0.4
 
-        # 3. Liste des reperes a afficher en 3D. On saute dh_frames[4] (T4,
-        # apres le pitch du poignet mais avant le roll) car son origine est
-        # identique a celle de T3 et T5 (a4=a5=d4=d5=0, axes concourants) ;
-        # l'afficher en plus n'apporterait qu'une triade superposee.
+        # 3. List of frames to display in 3D. We skip dh_frames[4] (T4,
+        # after the wrist pitch but before the roll) because its origin is
+        # identical to T3 and T5 (a4=a5=d4=d5=0, intersecting axes);
+        # displaying it as well would only add an overlapping triad.
         display_frames = [
             T_world,
             dh_frames[0],  # R1 (Base)
@@ -670,15 +665,15 @@ class DHFKApp(QtWidgets.QMainWindow):
 
         self._update_3d(display_frames)
 
-        # Les calculs (lecture + validation) utilisent la chaine DH complete,
-        # pas la liste filtree ci-dessus qui ne sert qu'a l'affichage
+        # Calculations (readout + validation) use the complete DH chain,
+        # not the filtered list above which is only for display
         self._update_readout(dh_frames)
         self.geo_panel.update_checks(dh_frames)
 
     def _update_3d(self, display_frames):
-        """Redessine le bras (liens + joints) et les triades d'axes
-        selon les reperes/axes actuellement coches dans l'UI."""
-        # display_frames[0] = repere monde (coin) -> exclu du trace des liens
+        """Redraws the arm (links + joints) and the axis triads
+        according to the currently checked frames/axes in the UI."""
+        # display_frames[0] = world frame (corner) -> excluded from link drawing
         arm_origins = np.array([T[:3, 3] for T in display_frames[1:]])
         self.link_item.setData(pos=arm_origins)
         self.joint_markers.setData(pos=arm_origins)
@@ -687,7 +682,7 @@ class DHFKApp(QtWidgets.QMainWindow):
         show_y = self.axis_checks['y'].isChecked()
         show_z = self.axis_checks['z'].isChecked()
 
-        xs, ys, zs = [], [], []
+        xs, ys, zs = [], [] , []
         for idx, T in enumerate(display_frames):
             if not self.frame_checks[idx].isChecked():
                 continue
@@ -705,8 +700,8 @@ class DHFKApp(QtWidgets.QMainWindow):
         self.axis_z.setData(pos=np.array(zs) if zs else np.zeros((0, 3)))
 
     def _update_readout(self, frames):
-        """Remplit le panneau texte : position/orientation de l'effecteur
-        (T0_5) et direction reelle de l'axe de chaque joint."""
+        """Fills the text panel: position/orientation of the end effector
+        (T0_5) and actual direction of each joint's axis."""
         T05 = frames[-1]
         pos = T05[:3, 3]
         roll, pitch, yaw = rotation_to_rpy_deg(T05[:3, :3])

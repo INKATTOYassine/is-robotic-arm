@@ -4,10 +4,12 @@ Software side of the arm: kinematics, control, firmware, and the digital twin.
 
 ## Structure
 
-- [`kinematics/`](kinematics/README.md) — DH parameters, forward kinematics, and (soon) inverse kinematics, with an interactive simulator to verify everything visually.
+*   `kinematics/` — Mathematical models for Forward (FK) and Inverse (IK) kinematics, utilizing Denavit-Hartenberg parameters. Includes custom PyQt5/OpenGL interactive simulators to verify coordinate frames and joint accessibility visually.
+    *   `/fk_simulator` : Real-time DH parameter and forward kinematics debugger.
+    *   `/ik_simulator` : Target-based analytical inverse kinematics solver with posture control (Elbow Up/Down) and reachability checks.
+*   `firmware/` — Custom C++ firmware for the Arduino Mega + RAMPS stack. It features a non-blocking, interrupt-driven (Timer1) architecture. Includes a custom low-level motion planner using the Bresenham algorithm for multi-axis spatial synchronization and the David Austin algorithm for trapezoidal velocity profiles (acceleration/deceleration).
+*   `control/` — Python control nodes acting as the bridge between the PC (or Raspberry Pi) and the Arduino Mega. Implements a strict, non-blocking asynchronous serial communication protocol (`<T,j1,j2,j3,j4,j5>`) to ensure EMI-resistant data transmission.
 
 ## Roadmap (not yet in the repo)
 
-- `firmware/` — Arduino Mega firmware (custom, joint-angle to step/dir conversion; testing phase uses grbl-Mega-5X)
-- `control/` — Raspberry Pi control node, RPi ↔ Mega serial communication
-- `digital_twin/` — ROS2 nodes publishing joint states, RViz/Gazebo visualization
+*   `digital_twin/` — ROS2 packages containing the URDF model of the robotic arm, nodes for publishing joint states, and integration with RViz and Gazebo for advanced 3D simulation and trajectory planning (via MoveIt 2).
